@@ -1,4 +1,4 @@
-﻿import { InputProps, div, setPropertyValue, getPropertyKey, mergeAttrs, getPropertyValue, HAttributes, merge } from "solenya"
+﻿import { InputProps, div, setPropertyValue, getPropertyKey, mergeAttrs, getPropertyValue, HAttributes, merge, Component, PropertyRef } from "solenya"
 import interact from 'interactjs'
 import { NestedCSSProperties } from "typestyle/lib/types"
 
@@ -9,7 +9,7 @@ export interface SliderStyle {
     currentLabel: (n: number) => string
     tickHeight: number
     tickLabelMargin: number
-    tickStep: number
+    tickStep?: number
     tickLabel: (n: number) => string
     trackThickness: number
     thumbWidth: number
@@ -18,18 +18,17 @@ export interface SliderStyle {
     labelFocus: NestedCSSProperties
 }
 
-const defaultSliderStyle = <SliderStyle>{ 
+const defaultSliderStyle = <SliderStyle>{
     trackColor: "#888",
     progressColor: "skyblue",
     ticks: "none",
     currentLabel: n => "" + n,
     tickHeight: 5,
     tickLabelMargin: 5,
-    tickStep: 1,
     tickLabel: n => "" + n,
     trackThickness: 10,
-    thumbWidth: 20,
-    thumbHeight: 20,
+    thumbWidth: 30,
+    thumbHeight: 30,
     thumbFocus: { backgroundColor: "white" },
     labelFocus: { color: "black" }
 }
@@ -40,202 +39,291 @@ export interface SliderProps extends InputProps<number> {
     step?: number,
     prefix?: string,
     style?: Partial<SliderStyle>
+    trackbarAttrs?: HAttributes,
     thumbContainerAttrs?: HAttributes,
     thumbAttrs?: HAttributes,
     labelAttrs?: HAttributes
 }
 
-const getPercent = (props: SliderProps) => {
-    const value = getPropertyValue(props.target, props.prop)
-    return (value - props.min) / (props.max - props.min) * 100
-}
+export const slider = (props: SliderProps) =>
+    new Slider(props).view()
 
-export const slider = (props: SliderProps) => {
-    const id = (props.prefix ? props.prefix + "-" : "") + "slider-" + getPropertyKey(props.prop)
+class Slider implements Required<SliderProps>
+{    
+    target!: Component
+    prop!: PropertyRef<number>
+    min!: number
+    max!: number
+    step: number
+    prefix: string    
+    attrs: HAttributes = {}
+    trackbarAttrs: HAttributes = {}
+    thumbContainerAttrs: HAttributes = {}
+    thumbAttrs: HAttributes = {}
+    labelAttrs: HAttributes = {}
+    style: SliderStyle
 
-    const myStyle = props.style = <SliderStyle>merge(props.style, defaultSliderStyle)
+    constructor(props: SliderProps) {
+        for (const key in props)
+            this[key] = props[key]
+        
+        this.step = props.step || 1
+        this.prefix = props.prefix || ""
+        this.style = <SliderStyle>merge(props.style, defaultSliderStyle)                
+    }  
 
-    const updateIndicators = (target: HTMLElement, setFocus = false) => {
-        const percent = getPercent(props)
-        const thumbContainer = target.getElementsByClassName("slider-thumb-container")[0] as HTMLElement
-        thumbContainer.style.left = `${percent}%`
-        const cl = myStyle.progressColor
-        const cr = myStyle.trackColor
-        target.style.background = `linear-gradient(to right, ${cl} 0%, ${cl} ${percent}%, ${cr} ${percent}%, ${cr} 100%)`
-        if (setFocus)
-            target.focus()
+    get value() {
+        return getPropertyValue(this.target, this.prop)
+    }     
+
+    set value(value: number) {
+        setPropertyValue(this.target, this.prop, value)
+        this.updateThumbPosition()
     }
 
-    const onSlide = (event: any) => {
-        const el = document.getElementById(id)!
-        const x = event.type == "tap" ? (event.pageX - el.getBoundingClientRect().left) : event.pageX
-        const fraction = constrain(x / el.clientWidth, 0, 1)
-        const value = props.min + Math.round(fraction * (props.max - props.min))
-        setPropertyValue(props.target, props.prop, value)
-        updateIndicators(el, true)        
+    get percent () {        
+        return (this.value - this.min) / (this.max - this.min) * 100
     }
 
-    const cap = (side: "start" | "end") =>
-        div({
-            onclick: e => {
-                setPropertyValue(props.target, props.prop, side == "start" ? props.min : props.max)
-                updateIndicators(document.getElementById(id)!, true)
-            },
-            class: "slider-cap",
-            style: {
-                cursor: "pointer",
-                borderTopLeftRadius: side == "start" ? myStyle.trackThickness / 2 : 0,
-                borderBottomLeftRadius: side == "start" ? myStyle.trackThickness / 2 : 0,
-                borderTopRightRadius: side == "end" ? myStyle.trackThickness / 2 : 0,
-                borderBottomRightRadius: side == "end" ? myStyle.trackThickness / 2 : 0,
-                height: myStyle.trackThickness + "px",
-                width: (myStyle.thumbWidth / 2) + "px",
-                backgroundColor: side == "start" ? myStyle.progressColor : myStyle.trackColor
-            }
+    get id() {
+        const p = this.prefix ? this.prefix + "-" : ""
+        return p + "slider-" + getPropertyKey(this.prop)
+    }
+
+    get sliderElement() {
+        return document.getElementById(this.id)!
+    }
+
+    get trackbarElement() {        
+        return this.sliderElement.querySelector(".slider-trackbar") as HTMLElement
+    }
+
+    get thumbContainerElement() {
+        return this.trackbarElement.querySelector(".slider-thumb-container") as HTMLElement
+    }
+
+    updateThumbPosition() {
+        this.target.onRefreshed(() => {
+            this.thumbContainerElement.style.left = `${this.percent}%`
+            const cl = this.style.progressColor
+            const cr = this.style.trackColor
+            const p = this.percent
+            this.trackbarElement.style.background = `linear-gradient(to right, ${cl} 0%, ${cl} ${p}%, ${cr} ${p}%, ${cr} 100%)`
         })
+    }
 
-    const value = getPropertyValue(props.target, props.prop)
+    onSlide (event: any) {        
+        const x = event.type == "tap" ? (event.pageX - this.trackbarElement.getBoundingClientRect().left) : event.pageX
+        const fraction = constrain(x / this.trackbarElement.clientWidth, 0, 1)
+        this.value = this.min + Math.round(fraction * (this.max - this.min) / this.step!) * this.step!        
+        this.sliderElement.focus()
+    }
 
-    return (
-        div({
-            class: "slider-container",
-            style: {
-                display: "flex",
-                alignItems: "center",
-                width: "100%",
-                marginBottom: props.style.ticks == "labeled-ticks" ? "2rem" : 0
-            }
-        },
-            cap("start"),
-            div(
-                mergeAttrs(props.attrs, {
-                    id: id,
-                    tabindex: 0,
-                    style: sliderStyle(props),
-                    onAttached: e => {
-                        updateIndicators(<HTMLElement>e)
-                        interact('#' + id).draggable({
-                            origin: 'self',
-                            inertia: true,
-                            modifiers: [
-                                interact.modifiers.restrict({
-                                    restriction: 'self'
-                                })
-                            ],
-                            listeners: {
-                                move: onSlide
-                            }
-                        }).on("tap", onSlide)
-                            .styleCursor(false)
-                    },
-                    onkeydown: e => {
-                        if (e.keyCode >= 37 && e.keyCode <= 40) {
-                            const sign = e.keyCode == 37 || e.keyCode == 40 ? 1 : -1
-                            const newValue = constrain(value - (props.step || 1) * sign, props.min, props.max)
-                            setPropertyValue(props.target, props.prop, newValue)
-                            updateIndicators(document.getElementById(id)!)
-                        }
-                    }
-                }),
-                ticks(props),
-                div(mergeAttrs({ class: "slider-thumb-container", style: thumbContainerStyle }, props.thumbContainerAttrs),
-                    div(mergeAttrs({ class: "slider-thumb", style: thumbStyle(props) }, props.thumbAttrs),
-                        div(mergeAttrs({ class: "slider-label", style: labelStyle }, props.labelAttrs),
-                            props.style?.currentLabel ? props.style?.currentLabel(value) : getPercent(props).toFixed(0)
-                        )
+    capView (side: "start" | "end") {
+        return (
+            div({
+                onclick: e => {
+                    this.value = side == "start" ? this.min : this.max
+                    this.sliderElement.focus()
+                },
+                class: "slider-cap",
+                style: {
+                    cursor: "pointer",
+                    borderTopLeftRadius: side == "start" ? this.style.trackThickness / 2 : 0,
+                    borderBottomLeftRadius: side == "start" ? this.style.trackThickness / 2 : 0,
+                    borderTopRightRadius: side == "end" ? this.style.trackThickness / 2 : 0,
+                    borderBottomRightRadius: side == "end" ? this.style.trackThickness / 2 : 0,
+                    height: this.style.trackThickness + "px",
+                    width: (this.style.thumbWidth / 2) + "px",
+                    backgroundColor: side == "start" ? this.style.progressColor : this.style.trackColor
+                }
+            })
+        )
+    }
+
+    thumbView() {
+        return (
+            div(mergeAttrs({ class: "slider-thumb-container", style: this.thumbContainerStyle() }, this.thumbContainerAttrs),
+                div(mergeAttrs({ class: "slider-thumb", style: this.thumbStyle() }, this.thumbAttrs),
+                    div(mergeAttrs({ class: "slider-label", style: this.labelStyle() }, this.labelAttrs),
+                        this.style.currentLabel ? this.style.currentLabel(this.value) : this.value
                     )
                 )
-            ),
-            cap("end")
+            )
         )
-    )
-}
+    }
 
-const ticks = (props: SliderProps) =>
-    props.style?.ticks == "none" ? undefined :
-        div({
-            style: {
-                position: "absolute",
-                left: 0,
-                right: 0,
-                top: "100%",
-                display: "flex",
-                justifyContent: "space-between",
-                height: props.style!.tickHeight + "px",
-                $nest: {
-                    "> div": {
-                        borderLeftWidth: "1px",
-                        borderLeftStyle: "solid",
-                        position: "relative",
-                        $nest: {
-                            "> div": {
-                                position: "absolute",
-                                top: "50%",
-                                transform: `translate(-50%, ${props.style!.tickLabelMargin}px)`
-                            }
+    valueAtTickStep(x: number) {
+        return this.min + x * (this.style.tickStep || this.step)
+    }
+
+    ticksView() {
+        return this.style.ticks == "none" ?
+            undefined :
+            div({
+                class: "slider-ticks",
+                style: this.ticksStyle()
+            },
+                range(0, (this.max - this.min) / (this.style.tickStep || this.step) + 1).map(x =>
+                    div({
+                        style: {
+                            borderLeftColor: getPropertyValue(this.target, this.prop) <= x ?
+                        this.style.trackColor : this.style.progressColor } },
+                        this.style.ticks != "labeled-ticks" ?
+                            undefined :
+                            div(!this.style.tickLabel ?
+                                this.valueAtTickStep(x) :
+                                this.style.tickLabel(this.valueAtTickStep(x))
+                            )
+                    )
+                )
+            )
+    }
+
+    trackbarView() {
+        return (
+            div(mergeAttrs(this.trackbarAttrs, {
+                class: "slider-trackbar",
+                style: this.trackbarStyle(),
+                onAttached: e => {
+                    this.updateThumbPosition()
+                    interact('#' + this.id + ">.slider-trackbar").draggable({
+                        origin: 'self',
+                        inertia: true,
+                        modifiers: [
+                            interact.modifiers.restrict({
+                                restriction: 'self'
+                            })
+                        ],
+                        listeners: {
+                            move: e => this.onSlide(e)
+                        }
+                    })
+                        .on("tap", e => this.onSlide(e))
+                        .styleCursor(false)
+                }
+            }),
+                this.ticksView(),
+                this.thumbView()
+            )
+        )
+    }
+
+    view() {
+        return (
+            div(mergeAttrs(this.attrs, {
+                id: this.id,
+                class: "slider",
+                tabindex: 0,
+                style: this.sliderStyle(),
+                onkeydown: e => {
+                    if (e.keyCode >= 37 && e.keyCode <= 40) {
+                        const sign = e.keyCode == 37 || e.keyCode == 40 ? 1 : -1
+                        this.value = constrain(this.value - this.step * sign, this.min, this.max)                        
+                        this.sliderElement.focus()
+                    }
+                }
+            }),
+                this.capView("start"),
+                this.trackbarView(),
+                this.capView("end")
+            )
+        )
+    }
+
+    sliderStyle() {
+        return <NestedCSSProperties>{
+            display: "flex",
+            alignItems: "center",
+            width: "100%",
+            marginBottom: this.style.ticks == "labeled-ticks" ? "2rem" : 0,
+            $nest: {
+                "&:focus": { outline: "none" },
+                "&:focus .slider-thumb": this.style.thumbFocus,
+                "&:focus .slider-label": this.style.labelFocus
+            }
+        }
+    }
+
+    trackbarStyle() {
+        return <NestedCSSProperties>{
+            display: "flex",
+            position: "relative",
+            width: "100%",
+            height: this.style.trackThickness + "px",
+            margin: this.style.trackThickness + "px auto",
+            backgroundColor: this.style.trackColor,
+            boxSizing: "border-box",
+            touchAction: "none",
+            "-ms-touch-action": "none",
+            cursor: "pointer"
+        }
+    }
+
+    thumbContainerStyle() {
+        return <NestedCSSProperties> {
+            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+        }
+    }
+
+    thumbStyle() {
+        return <NestedCSSProperties>{
+            display: "flex",
+            alignItems: "center",
+            width: this.style.thumbWidth + "px",
+            height: this.style.thumbHeight + "px",
+            transform: "translateX(-50%)",
+            border: "solid 1px #fff",
+            borderRadius: this.style.thumbWidth,
+            boxShadow: "4px 4px 4px rgba(0, 0, 0, .2), 0 0 4px rgba(0, 0, 0, .2)",
+            backgroundColor: "#444"
+        }
+    }
+
+    labelStyle() {
+        return <NestedCSSProperties>{
+            outline: "none",
+            whiteSpace: "nowrap",
+            userSelect: "none",
+            "-ms-user-select": "none",
+            pointerEvents: "none",
+            color: "white",
+            width: "100%",
+            textAlign: "center",
+            fontWeight: "bold"
+        }
+    }
+
+    ticksStyle() {
+        return <NestedCSSProperties>{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: "100%",
+            display: "flex",
+            justifyContent: "space-between",
+            height: this.style.tickHeight + "px",
+            $nest: {
+                "> div": {
+                    borderLeftWidth: "1px",
+                    borderLeftStyle: "solid",
+                    position: "relative",
+                    $nest: {
+                        "> div": {
+                            position: "absolute",
+                            top: "50%",
+                            transform: `translate(-50%, ${this.style.tickLabelMargin}px)`,
+                            userSelect: "none",
+                            "-ms-user-select": "none"
                         }
                     }
                 }
             }
-        },
-            range(0, (props.max - props.min) / (props.style?.tickStep || props.step || 1) + 1).map(x =>
-                div({ style: { borderLeftColor: getPropertyValue(props.target, props.prop) <= x ? props.style?.trackColor : props.style?.progressColor } },
-                    props.style?.ticks != "labeled-ticks" ?
-                        undefined :
-                        div(props.style.tickLabel ?
-                            props.style.tickLabel!(props.min + (x * (props.step || 1))) :
-                            props.min + (x * (props.step || 1))
-                        )
-                )
-            )
-        )
-
-const sliderStyle = (props: SliderProps) => <NestedCSSProperties>{
-    display: "flex",
-    position: "relative",
-    width: "100%",
-    height: props.style!.trackThickness + "px",
-    margin: props.style!.trackThickness + "px auto",
-    backgroundColor: props.style!.trackColor,
-    boxSizing: "border-box",
-    touchAction: "none",
-    "-ms-touch-action": "none",
-    cursor: "pointer",
-    $nest: {
-        "&:focus": { outline: "none" },
-        "&:focus .slider-thumb": props.style!.thumbFocus,                   
-        "&:focus .slider-label": props.style!.labelFocus
+        }
     }
-}
-
-const thumbContainerStyle = <NestedCSSProperties>{
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center"
-}
-
-const thumbStyle = (props: SliderProps) => <NestedCSSProperties>{
-    display: "flex",
-    alignItems: "center",
-    width: props.style!.thumbWidth + "px",
-    height: props.style!.thumbHeight + "px",
-    transform: "translateX(-50%)",
-    border: "solid 1px #fff",
-    borderRadius: "1em",
-    backgroundColor: "#444"    
-}
-
-const labelStyle = <NestedCSSProperties>{
-    outline: "none",
-    whiteSpace: "nowrap",
-    userSelect: "none",
-    "-ms-user-select": "none",
-    pointerEvents: "none",
-    color: "white",
-    width: "100%",
-    textAlign: "center",
-    fontWeight: "bold"
 }
 
 export const constrain = (x: number, min: number, max: number) =>
