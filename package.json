@@ -1,0 +1,21 @@
+{
+  "name": "solenya-slider",
+  "version": "0.1.0",
+  "author": "solenya",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/solenya-group/solenya-slider"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "devDependencies": {
+    "@types/lodash.orderby": "4.6.4"
+  },
+  "peerDependencies": {
+    "solenya": "^1.2.8"
+  },
+  "dependencies": {
+    "interactjs": "1.9.7"
+  }
+}

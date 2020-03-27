@@ -1,0 +1,1 @@
+export { slider, SliderStyle, SliderProps } from './slider'
