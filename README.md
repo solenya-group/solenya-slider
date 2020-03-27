@@ -12,6 +12,10 @@ A custom slider for solenya that:
 
 `npm solenya-slider`
 
+# Playground / Demo
+
+https://stackblitz.com/edit/solenya-slider
+
 # Usage
 The usage of `slider` is as follows:
 
@@ -53,7 +57,7 @@ The `style` property has common styling properties for sliders. However, for low
         })  
 ```
 
-You can set the focused styling the thumb and label with the `thumbFocus` or `labelFocus` properties. For example:
+You can set the focused styling of the thumb and label with the `thumbFocus` or `labelFocus` properties. For example:
 
 ```typescript
         return slider({

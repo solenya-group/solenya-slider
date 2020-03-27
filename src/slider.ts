@@ -237,6 +237,12 @@ class Slider implements Required<SliderProps>
             alignItems: "center",
             width: "100%",
             marginBottom: this.style.ticks == "labeled-ticks" ? "2rem" : 0,
+            "-webkit-touch-callout": "none",
+            "-webkit-tap-highlight-color": "transparent",
+            userSelect: "none",
+            "-moz-user-select": "none",
+            "-webkit-user-select": "none",
+            "-ms-user-select": "none",
             $nest: {
                 "&:focus": { outline: "none" },
                 "&:focus .slider-thumb": this.style.thumbFocus,
@@ -286,9 +292,7 @@ class Slider implements Required<SliderProps>
     labelStyle() {
         return <NestedCSSProperties>{
             outline: "none",
-            whiteSpace: "nowrap",
-            userSelect: "none",
-            "-ms-user-select": "none",
+            whiteSpace: "nowrap",            
             pointerEvents: "none",
             color: "white",
             width: "100%",
@@ -316,8 +320,6 @@ class Slider implements Required<SliderProps>
                             position: "absolute",
                             top: "50%",
                             transform: `translate(-50%, ${this.style.tickLabelMargin}px)`,
-                            userSelect: "none",
-                            "-ms-user-select": "none"
                         }
                     }
                 }
@@ -326,7 +328,7 @@ class Slider implements Required<SliderProps>
     }
 }
 
-export const constrain = (x: number, min: number, max: number) =>
+const constrain = (x: number, min: number, max: number) =>
     Math.max(min, Math.min(max, x))
 
 const range = (start: number, count: number, step: number = 1) =>
