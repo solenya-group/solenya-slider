@@ -7,6 +7,7 @@ A custom slider for solenya that:
  * Works consistently across all major browsers (including IE11) and mobile devices
  * Bypasses the `inputRange` control, to allow customisation without excessive browser-dependent css hacking
  * Internally leverages the `interactjs` library to ensure compatability with touch devices
+ * Accessibility Support
 
 # Installation
 
@@ -80,6 +81,5 @@ Possible future improvements:
  * Vertical orientation
  * Select a range of values
  * Quick default styling for thumb (e.g. inline, outside, none)
- * Accessiblity
 
  The code is small, so copy the source code to customize yourself if necessary.

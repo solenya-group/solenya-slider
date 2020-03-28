@@ -36,8 +36,7 @@ const defaultSliderStyle = <SliderStyle>{
 export interface SliderProps extends InputProps<number> {
     min: number
     max: number
-    step?: number,
-    prefix?: string,
+    step?: number,    
     style?: Partial<SliderStyle>
     trackbarAttrs?: HAttributes,
     thumbContainerAttrs?: HAttributes,
@@ -54,22 +53,21 @@ class Slider implements Required<SliderProps>
     prop!: PropertyRef<number>
     min!: number
     max!: number
-    step: number
-    prefix: string    
+    step: number   
     attrs: HAttributes = {}
     trackbarAttrs: HAttributes = {}
     thumbContainerAttrs: HAttributes = {}
     thumbAttrs: HAttributes = {}
     labelAttrs: HAttributes = {}
     style: SliderStyle
+    sliderElement!: HTMLElement
 
     constructor(props: SliderProps) {
         for (const key in props)
             this[key] = props[key]
         
         this.step = props.step || 1
-        this.prefix = props.prefix || ""
-        this.style = <SliderStyle>merge(props.style, defaultSliderStyle)                
+        this.style = <SliderStyle>merge(props.style, defaultSliderStyle)                        
     }  
 
     get value() {
@@ -78,20 +76,11 @@ class Slider implements Required<SliderProps>
 
     set value(value: number) {
         setPropertyValue(this.target, this.prop, value)
-        this.updateThumbPosition()
+        this.updateThumb()
     }
 
     get percent () {        
         return (this.value - this.min) / (this.max - this.min) * 100
-    }
-
-    get id() {
-        const p = this.prefix ? this.prefix + "-" : ""
-        return p + "slider-" + getPropertyKey(this.prop)
-    }
-
-    get sliderElement() {
-        return document.getElementById(this.id)!
     }
 
     get trackbarElement() {        
@@ -102,14 +91,24 @@ class Slider implements Required<SliderProps>
         return this.trackbarElement.querySelector(".slider-thumb-container") as HTMLElement
     }
 
-    updateThumbPosition() {
-        this.target.onRefreshed(() => {
-            this.thumbContainerElement.style.left = `${this.percent}%`
-            const cl = this.style.progressColor
-            const cr = this.style.trackColor
-            const p = this.percent
-            this.trackbarElement.style.background = `linear-gradient(to right, ${cl} 0%, ${cl} ${p}%, ${cr} ${p}%, ${cr} 100%)`
-        })
+    updateAttributes() {
+        this.sliderElement.setAttribute("min", ""+this.min)
+        this.sliderElement.setAttribute("max", ""+this.max)
+        this.sliderElement.setAttribute("value", ""+this.value)
+        this.sliderElement.setAttribute("role", "slider")
+        this.sliderElement.setAttribute("aria-valuemin", ""+this.min)
+        this.sliderElement.setAttribute("aria-valuemax", ""+this.max)
+        this.sliderElement.setAttribute("aria-valuenow", "" + this.value)
+        this.sliderElement.setAttribute("aria-valuetext", "" + this.style.currentLabel (this.value))
+    }
+
+    updateThumb() {        
+        this.thumbContainerElement.style.left = `${this.percent}%`
+        const cl = this.style.progressColor
+        const cr = this.style.trackColor
+        const p = this.percent
+        this.trackbarElement.style.background = `linear-gradient(to right, ${cl} 0%, ${cl} ${p}%, ${cr} ${p}%, ${cr} 100%)`
+        this.updateAttributes()
     }
 
     onSlide (event: any) {        
@@ -186,21 +185,23 @@ class Slider implements Required<SliderProps>
                 class: "slider-trackbar",
                 style: this.trackbarStyle(),
                 onAttached: e => {
-                    this.updateThumbPosition()
-                    interact('#' + this.id + ">.slider-trackbar").draggable({
-                        origin: 'self',
-                        inertia: true,
-                        modifiers: [
-                            interact.modifiers.restrict({
-                                restriction: 'self'
-                            })
-                        ],
-                        listeners: {
-                            move: e => this.onSlide(e)
-                        }
+                    this.target.onRefreshed(() => {
+                        this.updateThumb()
+                        interact(this.trackbarElement).draggable({
+                            origin: 'self',
+                            inertia: true,
+                            modifiers: [
+                                interact.modifiers.restrict({
+                                    restriction: 'self'
+                                })
+                            ],
+                            listeners: {
+                                move: e => this.onSlide(e)
+                            }
+                        })
+                            .on("tap", e => this.onSlide(e))
+                            .styleCursor(false)
                     })
-                        .on("tap", e => this.onSlide(e))
-                        .styleCursor(false)
                 }
             }),
                 this.ticksView(),
@@ -212,10 +213,10 @@ class Slider implements Required<SliderProps>
     view() {
         return (
             div(mergeAttrs(this.attrs, {
-                id: this.id,
                 class: "slider",
                 tabindex: 0,
                 style: this.sliderStyle(),
+                onAttached: e => this.sliderElement = e as HTMLElement,
                 onkeydown: e => {
                     if (e.keyCode >= 37 && e.keyCode <= 40) {
                         const sign = e.keyCode == 37 || e.keyCode == 40 ? 1 : -1
