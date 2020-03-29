@@ -1,4 +1,4 @@
-﻿import { InputProps, div, setPropertyValue, getPropertyKey, mergeAttrs, getPropertyValue, HAttributes, merge, Component, PropertyRef } from "solenya"
+﻿import { InputProps, div, setPropertyValue, mergeAttrs, getPropertyValue, HAttributes, merge, Component, PropertyRef } from "solenya"
 import interact from 'interactjs'
 import { NestedCSSProperties } from "typestyle/lib/types"
 
@@ -11,6 +11,7 @@ export interface SliderStyle {
     tickLabelMargin: number
     tickStep?: number
     tickLabel: (n: number) => string
+    tickLabelHeight: number
     trackThickness: number
     thumbWidth: number
     thumbHeight: number
@@ -24,7 +25,8 @@ const defaultSliderStyle = <SliderStyle>{
     ticks: "none",
     currentLabel: n => "" + n,
     tickHeight: 5,
-    tickLabelMargin: 5,
+    tickLabelMargin: 5,    
+    tickLabelHeight: 16,    
     tickLabel: n => "" + n,
     trackThickness: 10,
     thumbWidth: 30,
@@ -156,25 +158,33 @@ class Slider implements Required<SliderProps>
         return this.min + x * (this.style.tickStep || this.step)
     }
 
+    get tickCount() {
+        return (this.max - this.min) / (this.style.tickStep || this.step) + 1
+    }
+
     ticksView() {
         return this.style.ticks == "none" ?
             undefined :
             div({
                 class: "slider-ticks",
                 style: this.ticksStyle()
-            },
-                range(0, (this.max - this.min) / (this.style.tickStep || this.step) + 1).map(x =>
+            },                
+                range(0, this.tickCount).map(x =>
                     div({
-                        style: {
-                            borderLeftColor: getPropertyValue(this.target, this.prop) <= x ?
-                        this.style.trackColor : this.style.progressColor } },
-                        this.style.ticks != "labeled-ticks" ?
-                            undefined :
-                            div(!this.style.tickLabel ?
-                                this.valueAtTickStep(x) :
-                                this.style.tickLabel(this.valueAtTickStep(x))
-                            )
-                    )
+                        class: "tick",
+                        style: {                                
+                            borderLeftColor: getPropertyValue(this.target, this.prop) < this.valueAtTickStep(x) ?
+                                this.style.trackColor :
+                                this.style.progressColor
+                        }
+                    },
+                    this.style.ticks != "labeled-ticks" ?
+                        undefined :
+                        div({ class: "tick-label" }, !this.style.tickLabel ?
+                            this.valueAtTickStep(x) :
+                            this.style.tickLabel(this.valueAtTickStep(x))                            
+                        )
+                    )                
                 )
             )
     }
@@ -203,7 +213,7 @@ class Slider implements Required<SliderProps>
                             .styleCursor(false)
                     })
                 }
-            }),
+            }),                
                 this.ticksView(),
                 this.thumbView()
             )
@@ -216,7 +226,8 @@ class Slider implements Required<SliderProps>
                 class: "slider",
                 tabindex: 0,
                 style: this.sliderStyle(),
-                onAttached: e => this.sliderElement = e as HTMLElement,
+                onAttached: e => { this.sliderElement = e as HTMLElement },
+                onUpdated: e => { this.sliderElement = e as HTMLElement },
                 onkeydown: e => {
                     if (e.keyCode >= 37 && e.keyCode <= 40) {
                         const sign = e.keyCode == 37 || e.keyCode == 40 ? 1 : -1
@@ -232,12 +243,15 @@ class Slider implements Required<SliderProps>
         )
     }
 
+    totalTickHeight() {
+        return this.style.tickHeight + (this.style.ticks != "labeled-ticks" ? 0 : this.style.tickLabelMargin + this.style.tickLabelHeight)
+    }
+
     sliderStyle() {
-        return <NestedCSSProperties>{
+        return <NestedCSSProperties>{            
             display: "flex",
-            alignItems: "center",
-            width: "100%",
-            marginBottom: this.style.ticks == "labeled-ticks" ? "2rem" : 0,
+            marginTop: Math.max(0, (this.style.thumbHeight - this.style.trackThickness) / 2),
+            marginBottom: this.totalTickHeight(),
             "-webkit-touch-callout": "none",
             "-webkit-tap-highlight-color": "transparent",
             userSelect: "none",
@@ -257,8 +271,8 @@ class Slider implements Required<SliderProps>
             display: "flex",
             position: "relative",
             width: "100%",
-            height: this.style.trackThickness + "px",
-            margin: this.style.trackThickness + "px auto",
+            height: this.style.trackThickness + "px", 
+            marginBottom: this.totalTickHeight(),
             backgroundColor: this.style.trackColor,
             boxSizing: "border-box",
             touchAction: "none",
@@ -272,7 +286,7 @@ class Slider implements Required<SliderProps>
             position: "relative",
             display: "flex",
             alignItems: "center",
-            justifyContent: "center"
+            justifyContent: "center"        
         }
     }
 
@@ -303,26 +317,23 @@ class Slider implements Required<SliderProps>
     }
 
     ticksStyle() {
-        return <NestedCSSProperties>{
-            position: "absolute",
+        return <NestedCSSProperties>{            
+            position: "absolute",            
             left: 0,
             right: 0,
             top: "100%",
             display: "flex",
-            justifyContent: "space-between",
-            height: this.style.tickHeight + "px",
+            justifyContent: "space-between",  
+            height: this.totalTickHeight(),            
             $nest: {
-                "> div": {
+                ".tick": {
+                    height: this.style.tickHeight,
                     borderLeftWidth: "1px",
-                    borderLeftStyle: "solid",
-                    position: "relative",
-                    $nest: {
-                        "> div": {
-                            position: "absolute",
-                            top: "50%",
-                            transform: `translate(-50%, ${this.style.tickLabelMargin}px)`,
-                        }
-                    }
+                    borderLeftStyle: "solid"                    
+                },
+                ".tick-label": {
+                    position:"absolute",
+                    transform: `translate(-50%,${this.style.tickLabelMargin}px)`,                    
                 }
             }
         }
