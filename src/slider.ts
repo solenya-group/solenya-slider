@@ -26,7 +26,7 @@ const defaultSliderStyle = <SliderStyle>{
     currentLabel: n => "" + n,
     tickHeight: 5,
     tickLabelMargin: 5,    
-    tickLabelHeight: 16,    
+    tickLabelHeight: 12,    
     tickLabel: n => "" + n,
     trackThickness: 10,
     thumbWidth: 30,
@@ -77,8 +77,10 @@ class Slider implements Required<SliderProps>
     }     
 
     set value(value: number) {
-        setPropertyValue(this.target, this.prop, value)
-        this.updateThumb()
+        if (value != this.value) {
+            setPropertyValue(this.target, this.prop, value)
+            this.updateThumb()
+        }
     }
 
     get percent () {        
@@ -92,31 +94,19 @@ class Slider implements Required<SliderProps>
     get thumbContainerElement() {
         return this.trackbarElement.querySelector(".slider-thumb-container") as HTMLElement
     }
-
-    updateAttributes() {
-        this.sliderElement.setAttribute("min", ""+this.min)
-        this.sliderElement.setAttribute("max", ""+this.max)
-        this.sliderElement.setAttribute("value", ""+this.value)
-        this.sliderElement.setAttribute("role", "slider")
-        this.sliderElement.setAttribute("aria-valuemin", ""+this.min)
-        this.sliderElement.setAttribute("aria-valuemax", ""+this.max)
-        this.sliderElement.setAttribute("aria-valuenow", "" + this.value)
-        this.sliderElement.setAttribute("aria-valuetext", "" + this.style.currentLabel (this.value))
-    }
-
-    updateThumb() {        
-        this.thumbContainerElement.style.left = `${this.percent}%`
+    
+    updateThumb() {                
         const cl = this.style.progressColor
         const cr = this.style.trackColor
         const p = this.percent
+        this.thumbContainerElement.style.left = p + "%"
         this.trackbarElement.style.background = `linear-gradient(to right, ${cl} 0%, ${cl} ${p}%, ${cr} ${p}%, ${cr} 100%)`
-        this.updateAttributes()
     }
 
-    onSlide (event: any) {        
+    onSlide(event: any) {
         const x = event.type == "tap" ? (event.pageX - this.trackbarElement.getBoundingClientRect().left) : event.pageX
         const fraction = constrain(x / this.trackbarElement.clientWidth, 0, 1)
-        this.value = this.min + Math.round(fraction * (this.max - this.min) / this.step!) * this.step!        
+        this.value = this.min + Math.round(fraction * (this.max - this.min) / this.step!) * this.step!
         this.sliderElement.focus()
     }
 
@@ -195,7 +185,7 @@ class Slider implements Required<SliderProps>
                 class: "slider-trackbar",
                 style: this.trackbarStyle(),
                 onAttached: e => {
-                    this.target.onRefreshed(() => {
+                    this.target.onRefreshed(() => {                        
                         this.updateThumb()
                         interact(this.trackbarElement).draggable({
                             origin: 'self',
@@ -221,11 +211,20 @@ class Slider implements Required<SliderProps>
     }
 
     view() {
+        this.target.onRefreshed (() => this.updateThumb())
         return (
             div(mergeAttrs(this.attrs, {
                 class: "slider",
                 tabindex: 0,
                 style: this.sliderStyle(),
+                min: this.min,
+                max: this.max,
+                value: this.value,
+                role: "slider",
+                "aria-valuemin": this.min,
+                "aria-valuemax": this.max,
+                "aria-valuenow": this.value,
+                "aria-valuetext": this.style.currentLabel(this.value),
                 onAttached: e => { this.sliderElement = e as HTMLElement },
                 onUpdated: e => { this.sliderElement = e as HTMLElement },
                 onkeydown: e => {
@@ -243,15 +242,16 @@ class Slider implements Required<SliderProps>
         )
     }
 
-    totalTickHeight() {
-        return this.style.tickHeight + (this.style.ticks != "labeled-ticks" ? 0 : this.style.tickLabelMargin + this.style.tickLabelHeight)
+    tickLabelHeight() {
+        return this.style.ticks != "labeled-ticks" ? 0 : (this.style.tickLabelMargin + this.style.tickLabelHeight)
     }
 
     sliderStyle() {
+        const pad = (this.style.thumbHeight - this.style.trackThickness) / 2
         return <NestedCSSProperties>{            
             display: "flex",
-            marginTop: Math.max(0, (this.style.thumbHeight - this.style.trackThickness) / 2),
-            marginBottom: this.totalTickHeight(),
+            paddingTop: Math.max(0, pad),
+            paddingBottom: Math.max(0, pad - this.style.tickHeight) + this.tickLabelHeight(),
             "-webkit-touch-callout": "none",
             "-webkit-tap-highlight-color": "transparent",
             userSelect: "none",
@@ -266,23 +266,23 @@ class Slider implements Required<SliderProps>
         }
     }
 
-    trackbarStyle() {
-        return <NestedCSSProperties>{
+    trackbarStyle() {        
+        return <NestedCSSProperties>{            
             display: "flex",
             position: "relative",
             width: "100%",
             height: this.style.trackThickness + "px", 
-            marginBottom: this.totalTickHeight(),
+            marginBottom: this.style.tickHeight,
             backgroundColor: this.style.trackColor,
             boxSizing: "border-box",
             touchAction: "none",
             "-ms-touch-action": "none",
-            cursor: "pointer"
+            cursor: "pointer"            
         }
     }
 
     thumbContainerStyle() {
-        return <NestedCSSProperties> {
+        return <NestedCSSProperties>{            
             position: "relative",
             display: "flex",
             alignItems: "center",
@@ -300,7 +300,8 @@ class Slider implements Required<SliderProps>
             border: "solid 1px #fff",
             borderRadius: this.style.thumbWidth,
             boxShadow: "4px 4px 4px rgba(0, 0, 0, .2), 0 0 4px rgba(0, 0, 0, .2)",
-            backgroundColor: "#444"
+            backgroundColor: "#444",
+            boxSizing: "border-box"
         }
     }
 
@@ -323,8 +324,7 @@ class Slider implements Required<SliderProps>
             right: 0,
             top: "100%",
             display: "flex",
-            justifyContent: "space-between",  
-            height: this.totalTickHeight(),            
+            justifyContent: "space-between",              
             $nest: {
                 ".tick": {
                     height: this.style.tickHeight,
