@@ -16,7 +16,8 @@ export interface SliderStyle {
     thumbWidth: number
     thumbHeight: number
     thumbFocus: NestedCSSProperties
-    labelFocus: NestedCSSProperties
+    labelFocus: NestedCSSProperties    
+    trackColorFunc: (percent: number, c1: string, c2: string) => string
 }
 
 const defaultSliderStyle = <SliderStyle>{
@@ -25,37 +26,40 @@ const defaultSliderStyle = <SliderStyle>{
     ticks: "none",
     currentLabel: n => "" + n,
     tickHeight: 5,
-    tickLabelMargin: 5,    
-    tickLabelHeight: 12,    
+    tickLabelMargin: 5,
+    tickLabelHeight: 12,
     tickLabel: n => "" + n,
     trackThickness: 10,
     thumbWidth: 30,
     thumbHeight: 30,
     thumbFocus: { backgroundColor: "white" },
-    labelFocus: { color: "black" }
+    labelFocus: { color: "black" },
+    trackColorFunc: (percent, c1, c2) => `linear-gradient(to right, ${c1} 0%, ${c1} ${percent}%, ${c2} ${percent}%, ${c2} 100%)`        
 }
 
 export interface SliderProps extends InputProps<number> {
     min: number
     max: number
-    step?: number,    
+    step?: number,
     style?: Partial<SliderStyle>
     trackbarAttrs?: HAttributes,
     thumbContainerAttrs?: HAttributes,
     thumbAttrs?: HAttributes,
-    labelAttrs?: HAttributes
+    labelAttrs?: HAttributes,
 }
+
+const round = (x: number) => Math.round(x*1000000)/1000000
 
 export const slider = (props: SliderProps) =>
     new Slider(props).view()
 
 class Slider implements Required<SliderProps>
-{    
+{
     target!: Component
     prop!: PropertyRef<number>
     min!: number
     max!: number
-    step: number   
+    step: number
     attrs: HAttributes = {}
     trackbarAttrs: HAttributes = {}
     thumbContainerAttrs: HAttributes = {}
@@ -67,40 +71,41 @@ class Slider implements Required<SliderProps>
     constructor(props: SliderProps) {
         for (const key in props)
             this[key] = props[key]
-        
+
         this.step = props.step || 1
-        this.style = <SliderStyle>merge(props.style, defaultSliderStyle)                        
-    }  
+        this.style = <SliderStyle>merge(props.style, defaultSliderStyle)
+    }
 
     get value() {
         return getPropertyValue(this.target, this.prop)
-    }     
+    }
 
-    set value(value: number) {
+    set value(value: number) {        
+        value = round (value)
         if (value != this.value) {
-            setPropertyValue(this.target, this.prop, value)
+            setPropertyValue(this.target, this.prop, value)            
             this.updateThumb()
         }
     }
 
-    get percent () {        
+    get percent() {
         return (this.value - this.min) / (this.max - this.min) * 100
     }
 
-    get trackbarElement() {        
+    get trackbarElement() {
         return this.sliderElement.querySelector(".slider-trackbar") as HTMLElement
     }
 
     get thumbContainerElement() {
         return this.trackbarElement.querySelector(".slider-thumb-container") as HTMLElement
     }
-    
-    updateThumb() {                
-        const cl = this.style.progressColor
-        const cr = this.style.trackColor
+
+    updateThumb() {
+        const c1 = this.style.progressColor
+        const c2 = this.style.trackColor
         const p = this.percent
-        this.thumbContainerElement.style.left = p + "%"
-        this.trackbarElement.style.background = `linear-gradient(to right, ${cl} 0%, ${cl} ${p}%, ${cr} ${p}%, ${cr} 100%)`
+        this.thumbContainerElement.style.left = p + "%"                
+        this.trackbarElement.style.background = this.style.trackColorFunc(p, c1, c2)
     }
 
     onSlide(event: any) {
@@ -110,7 +115,7 @@ class Slider implements Required<SliderProps>
         this.sliderElement.focus()
     }
 
-    capView (side: "start" | "end") {
+    capView(side: "start" | "end") {
         return (
             div({
                 onclick: e => {
@@ -145,7 +150,7 @@ class Slider implements Required<SliderProps>
     }
 
     valueAtTickStep(x: number) {
-        return this.min + x * (this.style.tickStep || this.step)
+        return round(this.min + x * (this.style.tickStep || this.step))
     }
 
     get tickCount() {
@@ -158,23 +163,23 @@ class Slider implements Required<SliderProps>
             div({
                 class: "slider-ticks",
                 style: this.ticksStyle()
-            },                
+            },
                 range(0, this.tickCount).map(x =>
                     div({
                         class: "tick",
-                        style: {                                
+                        style: {
                             borderLeftColor: getPropertyValue(this.target, this.prop) < this.valueAtTickStep(x) ?
                                 this.style.trackColor :
                                 this.style.progressColor
                         }
                     },
-                    this.style.ticks != "labeled-ticks" ?
-                        undefined :
-                        div({ class: "tick-label" }, !this.style.tickLabel ?
-                            this.valueAtTickStep(x) :
-                            this.style.tickLabel(this.valueAtTickStep(x))                            
-                        )
-                    )                
+                        this.style.ticks != "labeled-ticks" ?
+                            undefined :
+                            div({ class: "tick-label" }, !this.style.tickLabel ?
+                                this.valueAtTickStep(x) :
+                                this.style.tickLabel(this.valueAtTickStep(x))
+                            )
+                    )
                 )
             )
     }
@@ -185,7 +190,7 @@ class Slider implements Required<SliderProps>
                 class: "slider-trackbar",
                 style: this.trackbarStyle(),
                 onAttached: e => {
-                    this.target.onRefreshed(() => {                        
+                    this.target.onRefreshed(() => {
                         this.updateThumb()
                         interact(this.trackbarElement).draggable({
                             origin: 'self',
@@ -203,7 +208,7 @@ class Slider implements Required<SliderProps>
                             .styleCursor(false)
                     })
                 }
-            }),                
+            }),
                 this.ticksView(),
                 this.thumbView()
             )
@@ -211,7 +216,7 @@ class Slider implements Required<SliderProps>
     }
 
     view() {
-        this.target.onRefreshed (() => this.updateThumb())
+        this.target.onRefreshed(() => this.updateThumb())
         return (
             div(mergeAttrs(this.attrs, {
                 class: "slider",
@@ -230,7 +235,7 @@ class Slider implements Required<SliderProps>
                 onkeydown: e => {
                     if (e.keyCode >= 37 && e.keyCode <= 40) {
                         const sign = e.keyCode == 37 || e.keyCode == 40 ? 1 : -1
-                        this.value = constrain(this.value - this.step * sign, this.min, this.max)                        
+                        this.value = constrain(this.value - this.step * sign, this.min, this.max)
                         this.sliderElement.focus()
                     }
                 }
@@ -248,7 +253,7 @@ class Slider implements Required<SliderProps>
 
     sliderStyle() {
         const pad = (this.style.thumbHeight - this.style.trackThickness) / 2
-        return <NestedCSSProperties>{            
+        return <NestedCSSProperties>{
             display: "flex",
             paddingTop: Math.max(0, pad),
             paddingBottom: Math.max(0, pad - this.style.tickHeight) + this.tickLabelHeight(),
@@ -266,27 +271,27 @@ class Slider implements Required<SliderProps>
         }
     }
 
-    trackbarStyle() {        
-        return <NestedCSSProperties>{            
+    trackbarStyle() {
+        return <NestedCSSProperties>{
             display: "flex",
             position: "relative",
             width: "100%",
-            height: this.style.trackThickness + "px", 
+            height: this.style.trackThickness + "px",
             marginBottom: this.style.tickHeight,
             backgroundColor: this.style.trackColor,
             boxSizing: "border-box",
             touchAction: "none",
             "-ms-touch-action": "none",
-            cursor: "pointer"            
+            cursor: "pointer"
         }
     }
 
     thumbContainerStyle() {
-        return <NestedCSSProperties>{            
+        return <NestedCSSProperties>{
             position: "relative",
             display: "flex",
             alignItems: "center",
-            justifyContent: "center"        
+            justifyContent: "center"
         }
     }
 
@@ -308,7 +313,7 @@ class Slider implements Required<SliderProps>
     labelStyle() {
         return <NestedCSSProperties>{
             outline: "none",
-            whiteSpace: "nowrap",            
+            whiteSpace: "nowrap",
             pointerEvents: "none",
             color: "white",
             width: "100%",
@@ -318,22 +323,22 @@ class Slider implements Required<SliderProps>
     }
 
     ticksStyle() {
-        return <NestedCSSProperties>{            
-            position: "absolute",            
+        return <NestedCSSProperties>{
+            position: "absolute",
             left: 0,
             right: 0,
             top: "100%",
             display: "flex",
-            justifyContent: "space-between",              
+            justifyContent: "space-between",
             $nest: {
                 ".tick": {
                     height: this.style.tickHeight,
                     borderLeftWidth: "1px",
-                    borderLeftStyle: "solid"                    
+                    borderLeftStyle: "solid"
                 },
                 ".tick-label": {
-                    position:"absolute",
-                    transform: `translate(-50%,${this.style.tickLabelMargin}px)`,                    
+                    position: "absolute",
+                    transform: `translate(-50%,${this.style.tickLabelMargin}px)`,
                 }
             }
         }
@@ -344,5 +349,5 @@ const constrain = (x: number, min: number, max: number) =>
     Math.max(min, Math.min(max, x))
 
 const range = (start: number, count: number, step: number = 1) =>
-    Array.apply(0, Array(count))
-        .map((element, index) => (index * step) + start)
+    Array.apply(0, Array(Math.floor(count)))
+        .map((element, index) => round (index * step + start))
